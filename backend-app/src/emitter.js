@@ -3,9 +3,6 @@ const io = require('socket.io-client');
 const socket = io('http://localhost:3001'); // Change the URL as needed
 const data = require('../data.json'); // Load data from data.json
 
-
-
-// Function to create a sha-256 hash
 // Function to create a sha-256 hash
 function createHash(data) {
   const hash = crypto.createHash('sha256');
@@ -32,12 +29,12 @@ function emitMessages() {
   setInterval(() => {
     const originalMessage = generateRandomData();
     const secretKeyHex = createHash(originalMessage);
-    
+
     // Convert the secretKeyHex to a Buffer
     const secretKey = Buffer.from(secretKeyHex, 'hex');
-    
+
     // Generate a random IV
-    const iv = crypto.randomBytes(16); // 16 bytes for AES-256-CTR
+    const iv = crypto.randomBytes(16);
 
     // Encrypt the message with IV
     const cipher = crypto.createCipheriv('aes-256-ctr', secretKey, iv);
@@ -47,15 +44,10 @@ function emitMessages() {
     const message = {
       iv: iv.toString('hex'),
       encryptedMessage,
+      secret_key: secretKeyHex, // Include the hash of the secret key
     };
 
     socket.emit('message', message);
-  }, 2000); // Emit every 10 seconds
+  }, 10000); // Emit every 2 seconds
 }
-
-// Export the createHash function
-module.exports = {
-  createHash
-};
-
 emitMessages();

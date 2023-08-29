@@ -5,7 +5,7 @@ const express = require('express'); // Import Express
 const http = require('http'); // Import HTTP module
 const socketIo = require('socket.io');
 const mongoose = require('mongoose');
-const { createHash } = require('./emitter'); // Replace with the correct path to emitter.js
+// const { createHash } = require('./emitter'); // Replace with the correct path to emitter.js
 
 const cors = require('cors');
 
@@ -35,40 +35,45 @@ const Message = mongoose.model('Message', messageSchema);
 
 io.on('connection', (socket) => {
   console.log("connected to user");
+  const iv = crypto.randomBytes(16);
   socket.on('message', async (message) => {
+    console.log('Received a message:', message);
     try {
-      const { iv, encryptedMessage } = message;
-
-      // Verify the secret_key (replace 'YOUR_PASSKEY' with your actual passkey)
-      const secretKey = createHash(JSON.parse(decryptedMessage));
-      if (secretKey !== JSON.parse(decryptedMessage).secret_key) {
-        console.error('Data integrity compromised. Message discarded.');
-        return;
-      }
-
+      const { iv, encryptedMessage, secret_key } = message;
+  
       // Convert the IV from hex to a Buffer
       const ivBuffer = Buffer.from(iv, 'hex');
-
-      // Decrypt the message using the IV
-      const decipher = crypto.createDecipheriv('aes-256-ctr', secretKey, ivBuffer);
+  
+      // Decrypt the message using the IV from the message
+      const decipher = crypto.createDecipheriv('aes-256-ctr', Buffer.from(secret_key, 'hex'), ivBuffer);
       let decryptedMessage = decipher.update(encryptedMessage, 'hex', 'utf8');
       decryptedMessage += decipher.final('utf8');
-
+  
+      // Verify the secret_key
+      // if (secret_key !== createHash(JSON.parse(decryptedMessage))) {
+      //   console.error('Data integrity compromised. Message discarded.');
+      //   return;
+      // }
+  
       // Add a timestamp
       const timestamp = new Date();
       const messageWithTimestamp = {
         ...JSON.parse(decryptedMessage),
         timestamp,
       };
-
+  
       // Save the message to MongoDB
       const messageModel = new Message(messageWithTimestamp);
       await messageModel.save();
+  
+      console.log('Message saved:', messageWithTimestamp);
     } catch (error) {
       // Handle decryption and database errors
       console.error('Error processing message:', error);
     }
   });
+  
+  
 });
 
 
@@ -76,8 +81,6 @@ mongoose.connect('mongodb://127.0.0.1:27017/socketappdb', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
-
-// mongoose.connect('mongodb://127.0.0.1:27017/socketappdb');
 
 mongoose.connection.once('open', () => {
   console.log('Connected to MongoDB');
